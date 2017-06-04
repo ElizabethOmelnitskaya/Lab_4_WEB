@@ -1,56 +1,62 @@
 <?php
-$method_name = $_GET["method"];
-require_once("utils/errors.php");
-require_once("utils/functions.php");
+	const TEMPLATE_SESSION = array(5, 4, 2, 10);
 
-	session_save_path("internal/sessions");
-    session_start();
-  
-if(is_callable($method_name)) { $method_name(); }
-else {
-	    session_destroy();
-		ErrorApi("This method is unreal !!! :( "); 
-	}
+	require_once("utils/functions.php");
+	require_once("utils/errors.php");
 
-
-function login() {
-// добавляем исключение, если пользователь не дал логин!
-	require_once("internal/avaible-users.php");
-	$id = $_GET["id"];
-	$pass = $_GET["pass"];
-	$this_user_exists = false;
-	$list_users = arr_users();
-	
-	for($i = 0;$i < count($list_users);$i++){
-		if($list_users[$i] == $id){
-			$this_user_exists = true;
+	function login($username, $password) {
+		$response = array(ERROR_MESSAGE => null, SESSION => null);
+		if (($code = checkPassword($username, $password)) != OK_ID) {
+			$response[ERROR_MESSAGE] = MessageCode($code);
+			return json_encode($response);
 		}
-	}
-
- 	if($this_user_exists){
- 		$data = file("internal/data/$id.txt");
-		list($password, $value) = explode('#', $data[0]);
-		if($pass == $password){
-	
-			$_SESSION['id'] = $id;
-			api_login_response(session_id()); //Ответ пользователя api
-			successful_logout(); //Успешный выход из системы
+		if (($code = checkUsername($username)) != OK_ID) {
+			$response[ERROR_MESSAGE] = MessageCode($code);
+			return json_encode($response);
 		}
-		else{ ErrorApi("Incorrect password"); }
+		try {
+	        $sessionId = "";
+	        $fileName = "";
+	        do {
+	        	$sessionId = generateSessionId();
+	        	$fileName = "internal/sessions/" . $sessionId . ".txt";
+	        } while (file_exists($fileName));
+
+	        $file = fopen($fileName, "a+");
+	        fwrite($file, $username);
+	        $response[SESSION] = $sessionId;
+		}
+		catch (Exception $e) { $response[ERROR_MESSAGE] = $e->getMessage(); }
+		finally { fclose($file); }
+		return json_encode($response);
 	}
 
-	else { user_doesnt_exists(); } //Пользователь не существует
-}
+	function logout($sessionId) {
+		$response = array(ERROR_MESSAGE => null);
+		if ($code = checkSessionId($sessionId) != OK_ID) {
+			$response[ERROR_MESSAGE] = MessageCode($code);
+			return json_encode($response);
+		}
+		try {
+			$fileName = "internal/sessions/" . $sessionId . ".txt";
+			unlink($fileName);
+		} 
+		catch (Exception $e) { $response[ERROR_MESSAGE] = $e->getMessage(); }
+		return json_encode($response);
+	}
 
-function logout($login = NULL, $s_id = NULL){
-	$s_id = $_GET['session_id'];
-	if($_SESSION) {
-	    session_destroy(); // Сессия уничтожена
-	    successful("Logout successful");
+	function generateSessionId() {
+		$id = "";
+		for ($i = 0; $i < count(TEMPLATE_SESSION); $i++) {
+			for ($j = 0; $j < TEMPLATE_SESSION[$i]; $j++) { $id .= generateChar(); }
+			if ($i != count(TEMPLATE_SESSION) - 1) $id .= '-';
+		}
+		return $id;
 	}
-	else {
-		api_response(array(ERROR_MSG => "You can not destroy the session !!!" ));
+
+	function generateChar() {
+		if (rand(0, 1) == 0) { return chr(rand(ord('a'), ord('z'))); } 
+		else { return rand(0, 9); }
 	}
-}
 
 ?>

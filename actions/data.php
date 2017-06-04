@@ -1,59 +1,58 @@
-<?php
+<?php 
+    require_once("utils/functions.php");
+    require_once("utils/errors.php");
 
-require_once("utils/functions.php");
-require_once("utils/errors.php");
+    function getUserName($sessionId) {
+        $fileName = "internal/sessions/" . $sessionId . ".txt";
+        $file = fopen($fileName, "r"); //Открывает файл только для чтения
+        $name = fgets($file); //Читает строку из файла
+        fclose($file); //Закрывает файла, на который указывает дескриптор file
+        return $name;
+    }
 
-$data_method = $_GET["method"]; //данные получаются через URL с использованием  документации $_GET. 
+    function getUserText($sessionId) {
+    	$response = array(ERROR_MESSAGE => null, TEXT => null);
+        if (($code = checkSessionId($sessionId)) != OK_ID) {
+        	$response[ERROR_MESSAGE] = MessageCode($code);
+        	return json_encode($response);
+        }
+        try {
+            $username = getUserName($sessionId);
+            if (($code = checkUsername($username)) != OK_ID) {
+                $response[ERROR_MESSAGE] = MessageCode($code);
+        	    return json_encode($response);    
+            }
+            $fileName = "internal/data/" . $username . ".txt";
+            if (file_exists($fileName)) {
+            	$file = fopen($fileName, "r");
+            	$response[TEXT] = fread($file, filesize($fileName)); // читает до fileName байт из файлового указателя file и смещает указатель
+            	fclose($file);
+            } 
+        } 
+        catch(Error $e) { $response[ERROR_MESSAGE] = $e->getMessage(); }
+        return json_encode($response);
+    }
 
-if(is_callable($data_method)){ $data_method(); } // может быть вызвано 
-else { ErrorApi("This method is unreal !!! :( "); } // ошибка аpi
+    function setUserText($sessionId, $text) {
+        $response = array(ERROR_MESSAGE => null);
+        if (($code = checkSessionId($sessionId)) != OK_ID) {
+        	$response[ERROR_MESSAGE] = MessageCode($code);
+        	return json_encode($response);
+        }
+        try {
+            $username = getUserName($sessionId);
 
-function correct_user(){ // функция существующего пользователя
-	require_once("internal/avaible-users.php"); // файл откроется один раз
-	$UserExists_1 = false; // существующий пользыватель 
-	$id = $_SESSION['id']; // используется для получения или установки идентификатора текущей сесси
-	$list_users1 = arr_users(); // массив пользователей
-	for($i = 0; $i < count($list_users1); $i++){
-		if($list_users1[$i] == $id){
-			$UserExists_1 = true;
-		}
-	}
-	return $UserExists_1;
-}
+            if (($code = checkUsername($username)) != OK_ID) {
+                $response[ERROR_MESSAGE] = MessageCode($code);
+        	    return json_encode($response);    
+            }
+            $fileName = "internal/data/" . $username . ".txt";
+            $file = fopen($fileName, "a+");
+            fwrite($file, $text); // записывает text в содержимое file
+        } 
+        catch(Exception $e) { $response[ERROR_MESSAGE] = $e->getMessage(); }
+        finally { fclose($file); }
+        return json_encode($response);
+    }
 
-function get(){
-	$s_id = $_GET['session_id'];
-	$id = $_SESSION['id'];
-	$UserExists_1 = correct_user();
-
-	if($UserExists_1){ $info = file("internal/data/$id.txt"); }
-	else { ErrorApi("You do not have permission to this information!!! :("); }
-
-	list($password, $value) = explode('#', $info[0]); //Функция explode() возвращает массив элементами которого являются строки, полученные разбиением строки (info) при помощи разделителя #
-
-	if(sessionId() == $s_id) { Api_data_answer($value); } //Ответ данных Api
-	else{ ErrorApi("Wrong session !!!"); }
-}
-
-	function set(){
-		$s_id = $_GET['session_id'];
-		$id = $_SESSION['id'];
-		$somestring = $_GET['text'];
-		$UserExists_2 = correct_user();
-		if($s_id == sessionId()){
-			if($UserExists_2){
-				$file = file("internal/data/$id.txt");
-				$f_f = "internal/data/$id.txt";
-
-				list($password, $value) = explode('#', $file[0]);
-
-				$content = "$password*$somestring";
-				file_put_contents($f_f,$content);
-
-				successful("String added !!!"); //вызывается после успешного завершения
-			}
-			else{ ErrorApi("Wrong session !!!"); }
-		}
-		else{ ErrorApi("Wrong session !!!"); }
-	}
 ?>
