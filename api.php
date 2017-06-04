@@ -10,7 +10,7 @@
 		set_exception_handler('handleException');
 		set_error_handler('handleError');
 
-		if ($_SERVER["METHOD"] == "GET") {
+		if ($_SERVER["REQUEST_METHOD"] == "GET") {
 
 			$method = $_GET[METHOD_KEY];
 			if (($code = checkMethod($method)) != OK_ID) { return jsonError($code); }
